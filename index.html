@@ -332,7 +332,7 @@ onSnapshot(collection(db,"users"),snap=>{
 let arr=[];
 snap.forEach(d=>arr.push({...d.data(),id:d.id}));
 
-arr=arslice(0,100);
+arr=arr.slice(0,100);
 
 let coinTop=[...arr].sort((a,b)=>b.coins-a.coins);
 let scoreTop=[...arr].sort((a,b)=>b.total-a.total);
@@ -347,4 +347,7 @@ scoreTop.map((u,i)=>`<p>#${i+1} 👤 ${u.id}<br>⭐ ${u.total}</p>`).join("");
 
 window.closeLB=()=>lbBox.style.display="none";
 
-</script
+</script>
+
+</body>
+</html>
