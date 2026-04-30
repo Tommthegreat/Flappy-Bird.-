@@ -1,306 +1,350 @@
 <!DOCTYPE html>
 <html>
 <head>
-<title>Flappy Game</title>
-<style>
-body{margin:0;text-align:center;background:#70c5ce;font-family:sans-serif;}
-button{padding:10px;margin:5px;font-size:16px;}
-canvas{display:none;border:2px solid black;}
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Flappy Full Online</title>
 
-.box{
- display:none;
- position:fixed;
- top:50%;left:50%;
- transform:translate(-50%,-50%);
- background:white;
- padding:20px;
- border:3px solid black;
- width:260px;
- max-height:80vh;
- overflow-y:auto;
+<style>
+body{
+margin:0;
+font-family:sans-serif;
+background:#70c5ce;
+overflow:hidden;
+text-align:center;
 }
 
-.skin{padding:10px;margin:5px;border:2px solid black;cursor:pointer;}
+canvas{
+display:block;
+background:#70c5ce;
+touch-action:manipulation;
+}
 
-#ghostBtn{
- position:fixed;
- bottom:20px;
- right:20px;
- display:none;
+button{
+padding:10px;
+margin:5px;
+font-size:14px;
+}
+
+/* MENU BOX */
+.box{
+display:none;
+position:fixed;
+top:50%;
+left:50%;
+transform:translate(-50%,-50%);
+background:white;
+padding:15px;
+width:340px;
+max-height:70vh;
+overflow-y:auto;
+border:2px solid black;
+z-index:9999;
+}
+
+.skin{
+display:inline-block;
+padding:8px;
+margin:5px;
+border:1px solid black;
+cursor:pointer;
 }
 </style>
 </head>
+
 <body>
 
-<h2>🐦 Flappy Game</h2>
-
-<!-- HOME -->
 <div id="home">
+<h2>🐦 FLAPPY FULL ONLINE</h2>
+
+<p>👤 Username: <span id="myId"></span></p>
+
 <button onclick="startGame()">▶ Start</button>
-<button onclick="openShop()">🛒 Shop</button>
-<button onclick="openSettings()">⚙ Settings</button>
+<button onclick="openFriends()">👥 Friends</button>
+<button onclick="openAddFriend()">➕ Add Friend</button>
+<button onclick="openSkin()">🧥 Skins</button>
+<button onclick="openMail()">📩 Mail</button>
+<button onclick="openLB()">🏆 Leaderboard</button>
 </div>
 
-<!-- GAME -->
-<canvas id="game" width="300" height="400"></canvas>
+<p>Score: <span id="score">0</span></p>
+<p>Coins: <span id="coins">0</span></p>
+<p>Total: <span id="total">0</span></p>
 
-<!-- 👻 BUTTON -->
-<button id="ghostBtn" onclick="activateGhost()">👻 Power</button>
+<canvas id="game"></canvas>
 
-<!-- SHOP -->
-<div id="shop" class="box">
-<b>Shop</b>
-<button onclick="closeShop()">✖</button>
-
-<p>Coins: <span id="coinText">0</span></p>
-
-<div class="skin" onclick="buySkin('yellow',0)">🟡 Yellow (FREE)</div>
-<div class="skin" onclick="buySkin('red',100)">🔴 Red (100)</div>
-<div class="skin" onclick="buySkin('blue',200)">🔵 Blue (200)</div>
-<div class="skin" onclick="buySkin('green',300)">🟢 Green (300)</div>
-<div class="skin" onclick="buySkin('purple',400)">🟣 Purple (400)</div>
-<div class="skin" onclick="buySkin('orange',500)">🟠 Orange (500)</div>
-<div class="skin" onclick="buySkin('pink',600)">🌸 Pink (600)</div>
-<div class="skin" onclick="buySkin('black',700)">⚫ Black (700)</div>
-
-<div class="skin" onclick="buySkin('gold',2000)">👑 King (2000)</div>
-<div class="skin" onclick="buySkin('ghost',0)">👻 Ghost (CODE)</div>
+<!-- FRIENDS -->
+<div id="friendsBox" class="box">
+<h3>👥 Friends</h3>
+<div id="friendsList"></div>
+<button onclick="closeFriends()">Close</button>
 </div>
 
-<!-- SETTINGS -->
-<div id="settings" class="box">
-<b>Settings</b>
-<button onclick="closeSettings()">✖</button>
-
-<p>🏆 High Score: <span id="highScoreText">0</span></p>
-
-<hr>
-<input id="codeInput" placeholder="Enter code">
+<!-- ADD FRIEND -->
+<div id="addFriendBox" class="box">
+<h3>➕ Add Friend</h3>
+<input id="friendIdInput" placeholder="Username">
 <br><br>
-<button onclick="redeemCode()">Redeem</button>
+<button onclick="sendFriendRequest()">Send</button>
+<button onclick="closeAddFriend()">Close</button>
 </div>
 
-<script>
-// DATA
-let coins=parseInt(localStorage.coins||0);
-let skin=localStorage.skin||"yellow";
-let owned=JSON.parse(localStorage.owned||'["yellow"]');
-let highScore=parseInt(localStorage.highScore||0);
+<!-- SKINS -->
+<div id="skinBox" class="box">
+<h3>🧥 Skins</h3>
+<div class="skin" onclick="setSkin('yellow')">🟡</div>
+<div class="skin" onclick="setSkin('red')">🔴</div>
+<div class="skin" onclick="setSkin('blue')">🔵</div>
+<button onclick="closeSkin()">Close</button>
+</div>
 
-// 👻 GHOST POWER
-let ghostActive=false;
-let ghostUsed=false;
-let ghostTimer=0;
+<!-- MAIL -->
+<div id="mailBox" class="box">
+<h3>📩 Mail</h3>
+<div id="mailList"></div>
+<button onclick="closeMail()">Close</button>
+</div>
 
-// UI
-function updateUI(){
- coinText.innerText=coins;
- highScoreText.innerText=highScore;
+<!-- LEADERBOARD -->
+<div id="lbBox" class="box">
+<h3>🏆 Leaderboard</h3>
+
+<div style="display:flex;">
+<div style="width:50%;border-right:1px solid #ccc;">
+<h4>🪙 Coins</h4>
+<div id="coinLB"></div>
+</div>
+
+<div style="width:50%;">
+<h4>⭐ Total</h4>
+<div id="scoreLB"></div>
+</div>
+</div>
+
+<button onclick="closeLB()">Close</button>
+</div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.12.1/firebase-app.js";
+import {
+getFirestore,
+doc,setDoc,
+collection,
+addDoc,
+onSnapshot,
+getDoc
+} from "https://www.gstatic.com/firebasejs/12.12.1/firebase-firestore.js";
+
+const firebaseConfig={
+apiKey:"YOUR_KEY",
+authDomain:"YOUR_DOMAIN",
+projectId:"YOUR_PROJECT"
+};
+
+const app=initializeApp(firebaseConfig);
+const db=getFirestore(app);
+
+/* ================= USERNAME SYSTEM ================= */
+
+let username = localStorage.getItem("username");
+
+async function initUser(name){
+
+document.getElementById("myId").innerText = name;
+
+onSnapshot(doc(db,"users",name),(snap)=>{
+let data = snap.data();
+if(data){
+coins = data.coins || 0;
+total = data.total || 0;
+friends = data.friends || [];
+}
+});
 }
 
-// SHOP
-function openShop(){shop.style.display="block";updateUI();}
-function closeShop(){shop.style.display="none";}
+async function createUser(){
 
-// SETTINGS
-function openSettings(){settings.style.display="block";updateUI();}
-function closeSettings(){settings.style.display="none";}
+let name = prompt("Enter unique username:");
 
-// BUY SKIN
-function buySkin(name,price){
- if(name==="ghost"&&!owned.includes("ghost")){
-  alert("Use code!");
-  return;
- }
-
- if(owned.includes(name)){
-  skin=name;
-  localStorage.skin=skin;
-  return;
- }
-
- if(coins<price){
-  alert("Not enough coins");
-  return;
- }
-
- coins-=price;
- owned.push(name);
-
- localStorage.coins=coins;
- localStorage.owned=JSON.stringify(owned);
- localStorage.skin=name;
-
- updateUI();
+if(!name){
+location.reload();
+return;
 }
 
-// CODE (TOMM → GHOST)
-function redeemCode(){
- let code=codeInput.value;
+const snap = await getDoc(doc(db,"users",name));
 
- if(code==="Tomm"){
-  if(!owned.includes("ghost")){
-   owned.push("ghost");
-   localStorage.owned=JSON.stringify(owned);
-   alert("👻 Ghost unlocked!");
-  }else{
-   alert("Already unlocked!");
-  }
- }else{
-  alert("Wrong code");
- }
+if(snap.exists()){
+alert("Username already exists!");
+location.reload();
+return;
 }
 
-// GAME
-let c=game;
-let ctx=c.getContext("2d");
+localStorage.setItem("username",name);
 
-let y=200,v=0,g=0.3;
-let pipes=[];
-let frame=0;
-let score=0;
-let running=false;
-
-// START GAME
-function startGame(){
- home.style.display="none";
- c.style.display="block";
-
- y=200;v=0;pipes=[];frame=0;score=0;
- ghostUsed=false;
-
- running=true;
-
- ghostBtn.style.display=(skin==="ghost")?"block":"none";
-
- loop();
-}
-
-// 👻 ACTIVATE POWER (ONE TIME)
-function activateGhost(){
- if(skin!=="ghost"||ghostUsed) return;
-
- ghostActive=true;
- ghostUsed=true;
- ghostTimer=5;
-
- let t=setInterval(()=>{
-  ghostTimer--;
-  if(ghostTimer<=0){
-   ghostActive=false;
-   clearInterval(t);
-  }
- },1000);
-}
-
-// LOOP
-function loop(){
- if(!running) return;
-
- ctx.clearRect(0,0,300,400);
-
- v+=g;
- y+=v;
-
- let bx=50,by=y;
-
-// COLOR
-ctx.fillStyle = skin==="gold" ? "gold" :
-               skin==="ghost" ? "rgba(200,200,255,0.6)" :
-               skin;
-
-// BODY
-ctx.beginPath();
-ctx.arc(bx+10,by+10,10,0,Math.PI*2);
-ctx.fill();
-
-// WING
-ctx.fillStyle="orange";
-ctx.fillRect(bx+5,by+10+Math.sin(frame*0.3)*5,10,5);
-
-// 👑 KING
-if(skin==="gold"){
- ctx.fillStyle="yellow";
- ctx.fillRect(bx+5,by-5,10,4);
-}
-
-// 👻 GHOST AURA
-if(skin==="ghost"){
- ctx.fillStyle="rgba(180,220,255,0.2)";
- ctx.beginPath();
- ctx.arc(bx+10,by+10,ghostActive?20:14,0,Math.PI*2);
- ctx.fill();
-}
-
-// PIPES
-if(frame%90===0){
- let top=Math.random()*200;
- pipes.push({x:300,top:top});
-}
-
-pipes.forEach(p=>{
- p.x-=2;
-
- ctx.fillStyle="green";
- ctx.fillRect(p.x,0,40,p.top);
- ctx.fillRect(p.x,p.top+100,40,400);
-
- if(
-  bx+20>p.x && bx<p.x+40 &&
-  (by<p.top || by+20>p.top+100)
- ){
-  if(!ghostActive) endGame();
- }
-
- if(p.x===50){
-  score++;
-  coins++;
- }
+await setDoc(doc(db,"users",name),{
+coins:0,
+total:0,
+friends:[]
 });
 
-if(y>380 && !ghostActive) endGame();
-
-// UI
-ctx.fillStyle="black";
-ctx.fillText("Score: "+score,10,20);
-
-if(skin==="ghost"){
- if(ghostActive){
-  ctx.fillText("👻 "+ghostTimer+"s",200,20);
- }else if(ghostUsed){
-  ctx.fillText("❌ Used",200,20);
- }else{
-  ctx.fillText("👻 Ready",200,20);
- }
+initUser(name);
 }
 
-frame++;
+if(username){
+initUser(username);
+}else{
+createUser();
+}
+
+/* ================= GAME ================= */
+
+const c=document.getElementById("game");
+const ctx=c.getContext("2d");
+
+let y=200,v=0,g=0.55,running=false;
+let score=0;
+let pipes=[];
+let coins=0;
+let total=0;
+let friends=[];
+let skin="yellow";
+
+window.startGame=function(){
+home.style.display="none";
+c.style.display="block";
+resize();
+y=200;v=0;score=0;pipes=[];
+running=true;
+loop();
+};
+
+function resize(){
+c.width=innerWidth;
+c.height=innerHeight;
+}
+window.addEventListener("resize",resize);
+
+function loop(){
+if(!running)return;
+
+ctx.clearRect(0,0,c.width,c.height);
+
+v+=g;
+y+=v;
+
+ctx.fillStyle=skin;
+ctx.beginPath();
+ctx.arc(80,y,15,0,Math.PI*2);
+ctx.fill();
+
+if(!pipes.length||pipes[pipes.length-1].x<c.width-200){
+pipes.push({x:c.width,top:Math.random()*(c.height-170-120)+50,done:false});
+}
+
+for(let p of pipes){
+p.x-=3;
+
+ctx.fillStyle="green";
+ctx.fillRect(p.x,0,60,p.top);
+ctx.fillRect(p.x,p.top+170,60,c.height);
+
+if(80>p.x&&80<p.x+60&&(y<p.top||y>p.top+170)){
+gameOver();
+}
+
+if(!p.done&&p.x+60<80){
+p.done=true;
+score++;
+coins++;
+total++;
+}
+}
+
+pipes=pipes.filter(p=>p.x>-100);
+
+if(y>c.height||y<0)gameOver();
+
+document.getElementById("score").innerText=score;
+document.getElementById("coins").innerText=coins;
+document.getElementById("total").innerText=total;
+
 requestAnimationFrame(loop);
 }
 
-// END GAME
-function endGame(){
- running=false;
+/* TOUCH FIX */
+function flap(){ if(running) v=-9; }
+document.addEventListener("touchstart",flap,{passive:true});
+document.addEventListener("click",flap);
+document.addEventListener("mousedown",flap);
 
- if(score>highScore){
-  highScore=score;
-  localStorage.highScore=highScore;
- }
-
- localStorage.coins=coins;
-
- alert("Game Over! Score: "+score);
- location.reload();
+/* GAME OVER */
+function gameOver(){
+running=false;
+localStorage.coins=coins;
+localStorage.total=total;
+setDoc(doc(db,"users",username),{coins,total},{merge:true});
+home.style.display="block";
+c.style.display="none";
 }
 
-// JUMP
-document.addEventListener("click",()=>{
- if(running) v=-6;
+/* FRIENDS */
+window.openFriends=()=>friendsBox.style.display="block";
+window.closeFriends=()=>friendsBox.style.display="none";
+
+/* ADD FRIEND */
+window.openAddFriend=()=>addFriendBox.style.display="block";
+window.closeAddFriend=()=>addFriendBox.style.display="none";
+
+window.sendFriendRequest=function(){
+addDoc(collection(db,"mail"),{
+from:username,
+to:friendIdInput.value
 });
+};
 
-// LOAD
-updateUI();
-</script>
+/* MAIL */
+window.openMail=()=>{mailBox.style.display="block";loadMail();}
+window.closeMail=()=>mailBox.style.display="none";
 
-</body>
-</html>
+function loadMail(){
+onSnapshot(collection(db,"mail"),snap=>{
+let html="";
+snap.forEach(d=>{
+let m=d.data();
+if(m.to===username){
+html+=`<p>📩 ${m.from}</p><hr>`;
+}
+});
+mailList.innerHTML=html||"No mail";
+});
+}
+
+/* SKINS */
+window.openSkin=()=>skinBox.style.display="block";
+window.closeSkin=()=>skinBox.style.display="none";
+window.setSkin=(s)=>skin=s;
+
+/* LEADERBOARD */
+window.openLB=()=>{
+lbBox.style.display="block";
+
+onSnapshot(collection(db,"users"),snap=>{
+let arr=[];
+snap.forEach(d=>arr.push({...d.data(),id:d.id}));
+
+arr=arslice(0,100);
+
+let coinTop=[...arr].sort((a,b)=>b.coins-a.coins);
+let scoreTop=[...arr].sort((a,b)=>b.total-a.total);
+
+document.getElementById("coinLB").innerHTML=
+coinTop.map((u,i)=>`<p>#${i+1} 👤 ${u.id}<br>🪙 ${u.coins}</p>`).join("");
+
+document.getElementById("scoreLB").innerHTML=
+scoreTop.map((u,i)=>`<p>#${i+1} 👤 ${u.id}<br>⭐ ${u.total}</p>`).join("");
+});
+};
+
+window.closeLB=()=>lbBox.style.display="none";
+
+</script
