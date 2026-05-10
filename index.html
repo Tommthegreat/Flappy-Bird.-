@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Flappy Bird: Realistic Admin Edition</title>
+    <style>
+        body { margin: 0; background: #4ec0ca; overflow: hidden; touch-action: none; font-family: 'Segoe UI', sans-serif; }
+        canvas { display: block; }
+
+        .screen {
+            position: fixed; inset: 0; display: flex; flex-direction: column; 
+            justify-content: center; align-items: center; z-index: 20;
+            background: linear-gradient(#4ec0ca, #e0f7fa);
+        }
+
+        /* Registration & Admin Inputs */
+        input, select { 
+            padding: 12px; font-size: 18px; border-radius: 10px; border: 2px solid #fff; 
+            width: 260px; text-align: center; margin-bottom: 10px; outline: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        #error-msg { color: #d00; font-weight: bold; margin-bottom: 10px; height: 20px; text-shadow: 1px 1px #fff; }
+
+        /* Buttons */
+        .play-btn {
+            padding: 15px 60px; font-size: 30px; background: #ff9000; color: white;
+            border: 4px solid #fff; border-radius: 15px; cursor: pointer;
+            box-shadow: 0 6px 0 #d87a00; font-weight: 900; margin-bottom: 15px;
+            transition: 0.1s;
+        }
+        .play-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #d87a00; }
+        .admin-btn { background: #333; font-size: 14px; padding: 10px; box-shadow: 0 4px 0 #111; }
+
+        /* Scrollable Leaderboard */
+        .leaderboard {
+            background: rgba(255, 255, 255, 0.6); border-radius: 15px;
+            padding: 15px; width: 300px; border: 2px solid white; backdrop-filter: blur(5px);
+        }
+        .leaderboard h3 { margin: 0 0 10px 0; color: #2d5a27; text-align: center; }
+        #leaderboard-content { 
+            max-height: 160px; overflow-y: auto; padding-right: 5px;
+        }
+        .score-row { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid rgba(0,0,0,0.1); font-weight: bold; color: #333; }
+
+        /* Admin Panel Overlay */
+        #admin-panel { display: none; background: rgba(0,0,0,0.95); color: white; z-index: 100; }
+
+        /* Banned Screen */
+        #ban-screen { display:none; background: #000; color: #ff3333; }
+
+        #game-ui { position: fixed; top: 20px; width: 100%; text-align: center; color: white; font-size: 70px; font-weight: 900; z-index: 10; display: none; text-shadow: 4px 4px 0 #000; }
+    </style>
+</head>
+<body>
+
+    <div id="ban-screen" class="screen">
+        <h1 style="font-size:60px;">BANNED</h1>
+        <p id="ban-details" style="font-size:22px; padding:20px; text-align:center; color:white;"></p>
+        <p style="color:#888;">The system has locked your access.</p>
+    </div>
+
+    <div id="reg-screen" class="screen">
+        <h2 style="color:white; text-shadow:2px 2px #000; font-size: 32px;">SKY PILOT LOGIN</h2>
+        <div id="error-msg"></div>
+        <input type="text" id="username-input" placeholder="Username (5-10 chars)">
+        <button class="play-btn" style="font-size: 22px;" onclick="register()">CONFIRM</button>
+    </div>
+
+    <div id="home-screen" class="screen" style="display: none;">
+        <h1 id="welcome-text" style="color: white; text-shadow: 3px 3px #000; margin-bottom: 10px;">WELCOME</h1>
+        <button id="admin-tools-btn" class="play-btn admin-btn" onclick="toggleAdmin()" style="display:none; background: #d00;">ADMIN COMMAND CENTER</button>
+        <button class="play-btn" onclick="startGame()">PLAY</button>
+        <div class="leaderboard">
+            <h3>TOP PILOTS</h3>
+            <div id="leaderboard-content"></div>
+        </div>
+    </div>
+
+    <div id="admin-panel" class="screen">
+        <h2 style="color:#0f0">SHINBLOX80 PANEL</h2>
+        <input type="text" id="target-user" placeholder="Target Username">
+        <select id="ban-time">
+            <option value="1">1 Minute</option>
+            <option value="1440">1 Day</option>
+            <option value="10080">7 Days</option>
+            <option value="525600">1 Year</option>
+        </select>
+        <button class="play-btn admin-btn" style="background:#f00; width: 260px;" onclick="adminBan()">BAN PLAYER</button>
+        <button class="play-btn admin-btn" style="background:#007bff; width: 260px;" onclick="adminUnban()">UNBAN PLAYER</button>
+        <button class="play-btn admin-btn" style="background:#666; width: 260px;" onclick="adminRemove()">DELETE SCORE</button>
+        <button class="play-btn admin-btn" onclick="toggleAdmin()" style="margin-top: 20px;">BACK TO HOME</button>
+    </div>
+
+    <div id="game-ui">0</div>
+    <canvas id="game"></canvas>
+
+    <script>
+        const canvas = document.getElementById('game');
+        const ctx = canvas.getContext('2d');
+        const scoreUI = document.getElementById('game-ui');
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+
+        let currentUser = localStorage.getItem('flappy_user');
+        let leaderboard = JSON.parse(localStorage.getItem('flappy_board')) || [{name: "Shinblox80", score: 999}];
+        let bannedUsers = JSON.parse(localStorage.getItem('flappy_banned')) || {};
+
+        if(currentUser) checkBanStatus();
+
+        function checkBanStatus() {
+            let banExpiry = bannedUsers[currentUser.toLowerCase()];
+            if(banExpiry && Date.now() < banExpiry) {
+                document.getElementById('reg-screen').style.display = "none";
+                document.getElementById('home-screen').style.display = "none";
+                document.getElementById('ban-screen').style.display = "flex";
+                let minsLeft = Math.ceil((banExpiry - Date.now()) / 60000);
+                document.getElementById('ban-details').innerText = `User "${currentUser}" is banned for ${minsLeft} more minutes.`;
+                return true;
+            } else {
+                if(banExpiry) delete bannedUsers[currentUser.toLowerCase()];
+                localStorage.setItem('flappy_banned', JSON.stringify(bannedUsers));
+                showHome();
+                return false;
+            }
+        }
+
+        function register() {
+            let name = document.getElementById('username-input').value.trim();
+            if(name.length < 5 || name.length > 10) {
+                document.getElementById('error-msg').innerText = "Must be 5-10 characters!";
+                return;
+            }
+            let exists = leaderboard.find(u => u.name.toLowerCase() === name.toLowerCase());
+            if(exists && name.toLowerCase() !== (currentUser ? currentUser.toLowerCase() : "")) {
+                document.getElementById('error-msg').innerText = "This username is already exist!";
+                return;
+            }
+            currentUser = name;
+            localStorage.setItem('flappy_user', name);
+            if(!checkBanStatus()) showHome();
+        }
+
+        function showHome() {
+            document.getElementById('reg-screen').style.display = "none";
+            document.getElementById('ban-screen').style.display = "none";
+            document.getElementById('home-screen').style.display = "flex";
+            document.getElementById('welcome-text').innerText = "PILOT: " + currentUser.toUpperCase();
+            if(currentUser.toLowerCase() === "shinblox80") document.getElementById('admin-tools-btn').style.display = "block";
+            updateLeaderboard();
+        }
+
+        function updateLeaderboard() {
+            leaderboard.sort((a,b) => b.score - a.score);
+            let html = "";
+            leaderboard.forEach((u, i) => {
+                html += `<div class="score-row"><span>${i+1}. ${u.name}</span> <span>${u.score}</span></div>`;
+            });
+            document.getElementById('leaderboard-content').innerHTML = html;
+            localStorage.setItem('flappy_board', JSON.stringify(leaderboard));
+            localStorage.setItem('flappy_banned', JSON.stringify(bannedUsers));
+        }
+
+        // --- ADMIN CONTROLS ---
+        function toggleAdmin() {
+            let panel = document.getElementById('admin-panel');
+            panel.style.display = (panel.style.display === "flex") ? "none" : "flex";
+        }
+        function adminBan() {
+            let target = document.getElementById('target-user').value.trim().toLowerCase();
+            if(target === "shinblox80") { alert("Master cannot be banned!"); return; }
+            let mins = parseInt(document.getElementById('ban-time').value);
+            if(!target) return;
+            bannedUsers[target] = Date.now() + (mins * 60000);
+            alert(target + " banned successfully.");
+            updateLeaderboard();
+        }
+        function adminUnban() {
+            let target = document.getElementById('target-user').value.trim().toLowerCase();
+            if(bannedUsers[target]) { delete bannedUsers[target]; alert(target + " unbanned."); updateLeaderboard(); }
+            else alert("Not in ban list.");
+        }
+        function adminRemove() {
+            let target = document.getElementById('target-user').value.trim().toLowerCase();
+            leaderboard = leaderboard.filter(u => u.name.toLowerCase() !== target);
+            alert(target + " score deleted.");
+            updateLeaderboard();
+        }
+
+        // --- REALISTIC GAME ENGINE ---
+        let bird = { x: 80, y: 300, size: 24, v: 0, g: 0.5, lift: -8.5 };
+        let pipes = [], clouds = [], frame = 0, score = 0, active = false;
+
+        for(let i=0; i<4; i++) clouds.push({x: Math.random()*canvas.width, y: Math.random()*250, s: Math.random()*0.4 + 0.2, w: Math.random()*100+100});
+
+        function startGame() {
+            document.getElementById('home-screen').style.display = "none";
+            scoreUI.style.display = "block";
+            bird.y = canvas.height / 2; bird.v = 0; pipes = []; score = 0; frame = 0; scoreUI.innerText = "0";
+            active = true;
+        }
+
+        window.onpointerdown = () => { if(active) bird.v = bird.lift; };
+
+        function drawRealisticBackground() {
+            let skyGrad = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            skyGrad.addColorStop(0, "#4ec0ca"); skyGrad.addColorStop(1, "#e0f7fa");
+            ctx.fillStyle = skyGrad; ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = "rgba(255, 255, 255, 0.7)";
+            clouds.forEach(c => {
+                ctx.beginPath();
+                ctx.arc(c.x, c.y, 35, 0, 7); ctx.arc(c.x+35, c.y-15, 45, 0, 7); ctx.arc(c.x+70, c.y, 35, 0, 7);
+                ctx.fill();
+                c.x -= c.s; if(c.x < -200) c.x = canvas.width + 200;
+            });
+        }
+
+        function drawRealisticPipe(x, y, w, h, isTop) {
+            let pg = ctx.createLinearGradient(x, 0, x + w, 0);
+            pg.addColorStop(0, "#2d5a27"); pg.addColorStop(0.3, "#73bf2e"); pg.addColorStop(0.5, "#9fff5b"); pg.addColorStop(0.8, "#73bf2e"); pg.addColorStop(1, "#2d5a27");
+            ctx.fillStyle = pg;
+            ctx.fillRect(x, y, w, h);
+            ctx.strokeStyle = "#222"; ctx.lineWidth = 2; ctx.strokeRect(x, y, w, h);
+
+            let lipH = 35;
+            let lipY = isTop ? y + h - lipH : y;
+            ctx.fillStyle = pg;
+            ctx.fillRect(x - 6, lipY, w + 12, lipH);
+            ctx.strokeRect(x - 6, lipY, w + 12, lipH);
+        }
+
+        function drawRealisticBird() {
+            ctx.save();
+            ctx.translate(bird.x, bird.y);
+            ctx.rotate(bird.v * 0.05);
+
+            // 3D Spherical Texture
+            let birdGrad = ctx.createRadialGradient(-6, -6, 4, 0, 0, 25);
+            birdGrad.addColorStop(0, "#fff700"); birdGrad.addColorStop(1, "#ff8800");
+            
+            ctx.fillStyle = birdGrad;
+            ctx.beginPath(); ctx.arc(0, 0, bird.size, 0, 7); ctx.fill();
+            ctx.strokeStyle = "#000"; ctx.lineWidth = 3; ctx.stroke();
+
+            // Realistic Eye
+            ctx.fillStyle = "white"; ctx.beginPath(); ctx.arc(12, -7, 10, 0, 7); ctx.fill(); ctx.stroke();
+            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(16, -7, 4, 0, 7); ctx.fill();
+
+            // Wing with Shading
+            ctx.fillStyle = "#ffaa00";
+            ctx.beginPath(); ctx.ellipse(-12, 5, 14, 8, Math.sin(frame*0.2)*0.5, 0, 7); ctx.fill(); ctx.stroke();
+
+            ctx.restore();
+        }
+
+        function loop() {
+            drawRealisticBackground();
+            if (active) {
+                bird.v += bird.g; bird.y += bird.v;
+                if (frame % 90 === 0) {
+                    let gap = 210;
+                    let h = Math.random() * (canvas.height - 400) + 100;
+                    pipes.push({ x: canvas.width, t: h, b: h + gap, passed: false });
+                }
+                pipes.forEach(p => {
+                    p.x -= 4.5;
+                    drawRealisticPipe(p.x, 0, 80, p.t, true);
+                    drawRealisticPipe(p.x, p.b, 80, canvas.height - p.b, false);
+                    if (bird.x + 18 > p.x && bird.x - 18 < p.x + 80) {
+                        if (bird.y - 18 < p.t || bird.y + 18 > p.b) die();
+                    }
+                    if (!p.passed && p.x < bird.x) { p.passed = true; score++; scoreUI.innerText = score; }
+                });
+                if (bird.y + bird.size > canvas.height || bird.y - bird.size < 0) die();
+                pipes = pipes.filter(p => p.x > -120);
+                frame++;
+            }
+            drawRealisticBird();
+            requestAnimationFrame(loop);
+        }
+
+        function die() {
+            active = false;
+            let user = leaderboard.find(u => u.name.toLowerCase() === currentUser.toLowerCase());
+            if(user) { if(score > user.score) user.score = score; }
+            else { leaderboard.push({name: currentUser, score: score}); }
+            showHome();
+            scoreUI.style.display = "none";
+        }
+        loop();
+    </script>
+</body>
+</html>
