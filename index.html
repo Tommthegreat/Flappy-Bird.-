@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SKETHO</title>
+
+<style>
+*{
+margin:0;
+padding:0;
+box-sizing:border-box;
+font-family:Arial,sans-serif;
+}
+
+body{
+background:#111;
+height:100vh;
+overflow:hidden;
+}
+
+/* INTRO */
+#intro{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+background:#111;
+display:flex;
+flex-direction:column;
+align-items:center;
+justify-content:center;
+color:white;
+z-index:9999;
+}
+
+#intro h1{
+font-size:48px;
+color:#00ff99;
+}
+
+#loading{
+margin-top:20px;
+font-size:18px;
+color:#aaa;
+animation:pulse 1s infinite;
+}
+
+@keyframes pulse{
+0%{opacity:.3}
+50%{opacity:1}
+100%{opacity:.3}
+}
+
+/* APP */
+#app{
+display:none;
+height:100vh;
+flex-direction:column;
+}
+
+.header{
+height:55px;
+background:#1c1c1c;
+color:white;
+display:flex;
+align-items:center;
+justify-content:space-between;
+padding:0 15px;
+}
+
+.logo{
+font-size:24px;
+font-weight:bold;
+color:#00ff99;
+}
+
+.menuBtn{
+font-size:28px;
+cursor:pointer;
+}
+
+/* MENU */
+.menu{
+position:absolute;
+top:55px;
+right:10px;
+background:#222;
+width:200px;
+display:none;
+flex-direction:column;
+border-radius:12px;
+border:1px solid #444;
+z-index:1000;
+}
+
+.menu button{
+background:none;
+color:white;
+border:none;
+padding:12px;
+text-align:left;
+border-bottom:1px solid #333;
+}
+
+/* EDITOR */
+.editorWrap{
+flex:1;
+display:flex;
+overflow:hidden;
+}
+
+#lineNumbers{
+background:#151515;
+color:#666;
+padding:10px 5px;
+min-width:40px;
+text-align:right;
+font-size:15px;
+line-height:24px;
+overflow:hidden;
+}
+
+#editor{
+flex:1;
+background:#181818;
+color:#00ff99;
+border:none;
+outline:none;
+padding:10px;
+font-size:15px;
+line-height:24px;
+resize:none;
+}
+
+/* BOTTOM */
+.bottom{
+height:60px;
+background:#1c1c1c;
+display:flex;
+align-items:center;
+justify-content:center;
+gap:15px;
+}
+
+.bottom button{
+background:#2d2d2d;
+color:white;
+border:none;
+padding:10px 18px;
+border-radius:10px;
+}
+
+/* PREVIEW */
+#previewBox{
+position:fixed;
+top:0;
+left:0;
+width:100%;
+height:100%;
+display:none;
+background:white;
+z-index:99999;
+}
+
+#preview{
+width:100%;
+height:100%;
+border:none;
+}
+
+</style>
+</head>
+
+<body>
+
+<!-- INTRO -->
+<div id="intro">
+<h1>SKETHO</h1>
+<div id="loading">Loading...</div>
+</div>
+
+<!-- APP -->
+<div id="app">
+
+<div class="header">
+<div class="logo">SKETHO</div>
+<div class="menuBtn" onclick="toggleMenu()">⋮</div>
+</div>
+
+<div class="menu" id="menu">
+<button onclick="newFile()">📄 New File</button>
+<button onclick="openFiles()">📁 Files</button>
+<button onclick="saveFile()">💾 Save File</button>
+
+<button onclick="undoText()">↩ Undo</button>
+<button onclick="redoText()">↪ Redo</button>
+<button onclick="selectAllText()">🔵 Select All</button>
+<button onclick="cutText()">✂ Cut</button>
+<button onclick="copyText()">📋 Copy</button>
+<button onclick="pasteText()">📥 Paste</button>
+<button onclick="deleteText()">🗑 Delete</button>
+<button onclick="findText()">🔍 Find</button>
+<button onclick="goToLine()">📍 Go To Line</button>
+</div>
+
+<div class="editorWrap">
+<div id="lineNumbers">1</div>
+<textarea id="editor" placeholder="Write HTML here..."></textarea>
+</div>
+
+<div class="bottom">
+<button onclick="runCode()">▶ Run</button>
+<button onclick="clearEditor()">🧹 Clear</button>
+</div>
+
+</div>
+
+<div id="previewBox">
+<iframe id="preview"></iframe>
+</div>
+
+<script>
+
+/* ===== CORE ===== */
+const intro=document.getElementById('intro');
+const app=document.getElementById('app');
+const editor=document.getElementById('editor');
+const menu=document.getElementById('menu');
+const preview=document.getElementById('preview');
+const lineNumbers=document.getElementById('lineNumbers');
+
+/* FILE SYSTEM */
+let files = JSON.parse(localStorage.getItem("sketho_files") || "{}");
+let currentFile = "index.html";
+
+/* START */
+setTimeout(()=>{
+intro.style.display='none';
+app.style.display='flex';
+
+if(Object.keys(files).length===0){
+files["index.html"] = "";
+saveStore();
+}
+
+loadFile(currentFile);
+},5000);
+
+/* MENU */
+function toggleMenu(){
+menu.style.display = menu.style.display==='flex'?'none':'flex';
+}
+
+/* SAVE STORAGE */
+function saveStore(){
+localStorage.setItem("sketho_files", JSON.stringify(files));
+}
+
+/* NEW FILE (ALLOW SAME NAME) */
+function newFile(){
+let name = prompt("File name", "new.html");
+if(!name) return;
+
+if(!name.includes(".")) name += ".html";
+
+/* ALLOW DUPLICATES */
+let base = name.replace(".html","");
+let count = Object.keys(files).filter(f=>f.startsWith(base)).length;
+
+if(files[name]){
+name = base + " (" + (count+1) + ").html";
+}
+
+files[name] = "";
+saveStore();
+loadFile(name);
+menu.style.display='none';
+}
+
+/* LOAD FILE */
+function loadFile(name){
+currentFile = name;
+editor.value = files[name] || "";
+updateLines();
+}
+
+/* FILE LIST (SCROLLABLE) */
+function openFiles(){
+
+let box = document.createElement("div");
+box.style.position="fixed";
+box.style.top="50%";
+box.style.left="50%";
+box.style.transform="translate(-50%,-50%)";
+box.style.width="80%";
+box.style.maxHeight="60%";
+box.style.overflowY="auto";
+box.style.background="#222";
+box.style.color="white";
+box.style.padding="10px";
+box.style.borderRadius="10px";
+box.style.zIndex="999999";
+
+let html = "<h3>📁 Files</h3>";
+
+Object.keys(files).forEach(f=>{
+html += `
+<div style="padding:10px;border-bottom:1px solid #444;cursor:pointer"
+onclick="loadFileFromUI('${f}')">
+${f}
+</div>`;
+});
+
+html += `<button onclick="this.parentElement.remove()" style="
+width:100%;margin-top:10px;padding:10px;
+background:#00ff99;border:none;">Close</button>`;
+
+box.innerHTML = html;
+document.body.appendChild(box);
+
+menu.style.display='none';
+}
+
+function loadFileFromUI(name){
+loadFile(name);
+document.querySelectorAll("div").forEach(d=>{
+if(d.style.position==="fixed") d.remove();
+});
+}
+
+/* AUTO SAVE */
+editor.addEventListener('input',()=>{
+files[currentFile] = editor.value;
+saveStore();
+updateLines();
+});
+
+/* SAVE */
+function saveFile(){
+files[currentFile] = editor.value;
+saveStore();
+
+const blob = new Blob([editor.value], {type:'text/html'});
+const a = document.createElement('a');
+const url = URL.createObjectURL(blob);
+
+a.href = url;
+a.download = currentFile;
+
+document.body.appendChild(a);
+a.click();
+a.remove();
+
+URL.revokeObjectURL(url);
+menu.style.display='none';
+}
+
+/* RUN */
+function runCode(){
+preview.srcdoc = editor.value;
+document.getElementById('previewBox').style.display='block';
+}
+
+/* CLEAR */
+function clearEditor(){
+editor.value='';
+updateLines();
+}
+
+/* LINE NUMBERS */
+function updateLines(){
+let c = editor.value.split("\n").length;
+let t="";
+for(let i=1;i<=c;i++) t+=i+"<br>";
+lineNumbers.innerHTML=t;
+}
+
+/* BASIC FUNCTIONS (UNCHANGED) */
+function undoText(){}
+function redoText(){}
+function selectAllText(){editor.select();}
+function cutText(){navigator.clipboard.writeText(editor.value);editor.value="";updateLines();}
+function copyText(){navigator.clipboard.writeText(editor.value);}
+async function pasteText(){editor.value+=await navigator.clipboard.readText();updateLines();}
+function deleteText(){editor.value="";updateLines();}
+function findText(){let t=prompt("Find");if(!t)return;let i=editor.value.indexOf(t);if(i>=0)editor.setSelectionRange(i,i+t.length);}
+function goToLine(){let l=parseInt(prompt("Line"));if(!l)return;let p=0;let s=editor.value.split("\n");for(let i=0;i<l-1;i++)p+=s[i].length+1;editor.setSelectionRange(p,p);}
+
+updateLines();
+
+</script>
+
+</body>
+</html>
