@@ -68,17 +68,31 @@ display:flex;
 align-items:center;
 justify-content:space-between;
 padding:0 15px;
+gap:10px;
+overflow:hidden;
 }
 
 .logo{
 font-size:24px;
 font-weight:bold;
 color:#00ff99;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis;
+flex:1;
 }
 
 .menuBtn{
 font-size:28px;
 cursor:pointer;
+min-width:40px;
+text-align:center;
+display:flex;
+align-items:center;
+justify-content:center;
+flex-shrink:0;
+user-select:none;
+-webkit-user-select:none;
 }
 
 /* MENU */
