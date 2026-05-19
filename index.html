@@ -87,12 +87,14 @@ position:absolute;
 top:55px;
 right:10px;
 background:#222;
-width:200px;
+width:220px;
 display:none;
 flex-direction:column;
 border-radius:12px;
 border:1px solid #444;
 z-index:1000;
+overflow-y:auto;
+max-height:75vh;
 }
 
 .menu button{
@@ -102,6 +104,12 @@ border:none;
 padding:12px;
 text-align:left;
 border-bottom:1px solid #333;
+cursor:pointer;
+font-size:15px;
+}
+
+.menu button:hover{
+background:#333;
 }
 
 /* EDITOR */
@@ -114,12 +122,13 @@ overflow:hidden;
 #lineNumbers{
 background:#151515;
 color:#666;
-padding:10px 5px;
-min-width:40px;
+padding:10px 8px;
+min-width:50px;
 text-align:right;
 font-size:15px;
 line-height:24px;
 overflow:hidden;
+user-select:none;
 }
 
 #editor{
@@ -132,24 +141,8 @@ padding:10px;
 font-size:15px;
 line-height:24px;
 resize:none;
-}
-
-/* BOTTOM */
-.bottom{
-height:60px;
-background:#1c1c1c;
-display:flex;
-align-items:center;
-justify-content:center;
-gap:15px;
-}
-
-.bottom button{
-background:#2d2d2d;
-color:white;
-border:none;
-padding:10px 18px;
-border-radius:10px;
+overflow:auto;
+white-space:pre;
 }
 
 /* PREVIEW */
@@ -193,7 +186,7 @@ border:none;
 <button onclick="newFile()">📄 New File</button>
 <button onclick="openFiles()">📁 Files</button>
 <button onclick="saveFile()">💾 Save File</button>
-
+<button onclick="runCode()">▶ Run Code</button>
 <button onclick="undoText()">↩ Undo</button>
 <button onclick="redoText()">↪ Redo</button>
 <button onclick="selectAllText()">🔵 Select All</button>
@@ -208,11 +201,6 @@ border:none;
 <div class="editorWrap">
 <div id="lineNumbers">1</div>
 <textarea id="editor" placeholder="Write HTML here..."></textarea>
-</div>
-
-<div class="bottom">
-<button onclick="runCode()">▶ Run</button>
-<button onclick="clearEditor()">🧹 Clear</button>
 </div>
 
 </div>
@@ -246,11 +234,11 @@ saveStore();
 }
 
 loadFile(currentFile);
-},5000);
+},2000);
 
 /* MENU */
 function toggleMenu(){
-menu.style.display = menu.style.display==='flex'?'none':'flex';
+menu.style.display = menu.style.display==='flex' ? 'none' : 'flex';
 }
 
 /* SAVE STORAGE */
@@ -258,14 +246,13 @@ function saveStore(){
 localStorage.setItem("sketho_files", JSON.stringify(files));
 }
 
-/* NEW FILE (ALLOW SAME NAME) */
+/* NEW FILE */
 function newFile(){
 let name = prompt("File name", "new.html");
 if(!name) return;
 
 if(!name.includes(".")) name += ".html";
 
-/* ALLOW DUPLICATES */
 let base = name.replace(".html","");
 let count = Object.keys(files).filter(f=>f.startsWith(base)).length;
 
@@ -286,7 +273,7 @@ editor.value = files[name] || "";
 updateLines();
 }
 
-/* FILE LIST (SCROLLABLE) */
+/* FILE LIST */
 function openFiles(){
 
 let box = document.createElement("div");
@@ -315,7 +302,7 @@ ${f}
 
 html += `<button onclick="this.parentElement.remove()" style="
 width:100%;margin-top:10px;padding:10px;
-background:#00ff99;border:none;">Close</button>`;
+background:#00ff99;border:none;border-radius:8px;">Close</button>`;
 
 box.innerHTML = html;
 document.body.appendChild(box);
@@ -335,6 +322,11 @@ editor.addEventListener('input',()=>{
 files[currentFile] = editor.value;
 saveStore();
 updateLines();
+});
+
+/* FIXED LINE NUMBER SCROLL */
+editor.addEventListener('scroll',()=>{
+lineNumbers.scrollTop = editor.scrollTop;
 });
 
 /* SAVE */
@@ -359,34 +351,88 @@ menu.style.display='none';
 
 /* RUN */
 function runCode(){
+history.pushState({preview:true},"");
 preview.srcdoc = editor.value;
 document.getElementById('previewBox').style.display='block';
+menu.style.display='none';
 }
 
-/* CLEAR */
-function clearEditor(){
-editor.value='';
-updateLines();
-}
+/* MOBILE BACK BUTTON */
+window.addEventListener("popstate", ()=>{
+document.getElementById('previewBox').style.display='none';
+});
 
 /* LINE NUMBERS */
 function updateLines(){
-let c = editor.value.split("\n").length;
-let t="";
-for(let i=1;i<=c;i++) t+=i+"<br>";
-lineNumbers.innerHTML=t;
+let lines = editor.value.split("\n").length;
+let text="";
+
+for(let i=1;i<=lines;i++){
+text += i + "<br>";
 }
 
-/* BASIC FUNCTIONS (UNCHANGED) */
-function undoText(){}
-function redoText(){}
-function selectAllText(){editor.select();}
-function cutText(){navigator.clipboard.writeText(editor.value);editor.value="";updateLines();}
-function copyText(){navigator.clipboard.writeText(editor.value);}
-async function pasteText(){editor.value+=await navigator.clipboard.readText();updateLines();}
-function deleteText(){editor.value="";updateLines();}
-function findText(){let t=prompt("Find");if(!t)return;let i=editor.value.indexOf(t);if(i>=0)editor.setSelectionRange(i,i+t.length);}
-function goToLine(){let l=parseInt(prompt("Line"));if(!l)return;let p=0;let s=editor.value.split("\n");for(let i=0;i<l-1;i++)p+=s[i].length+1;editor.setSelectionRange(p,p);}
+lineNumbers.innerHTML = text;
+}
+
+/* BASIC FUNCTIONS */
+function undoText(){
+document.execCommand('undo');
+}
+
+function redoText(){
+document.execCommand('redo');
+}
+
+function selectAllText(){
+editor.select();
+}
+
+function cutText(){
+navigator.clipboard.writeText(editor.value);
+editor.value="";
+updateLines();
+}
+
+function copyText(){
+navigator.clipboard.writeText(editor.value);
+}
+
+async function pasteText(){
+editor.value += await navigator.clipboard.readText();
+updateLines();
+}
+
+function deleteText(){
+editor.value="";
+updateLines();
+}
+
+function findText(){
+let t = prompt("Find");
+if(!t) return;
+
+let i = editor.value.indexOf(t);
+
+if(i >= 0){
+editor.focus();
+editor.setSelectionRange(i, i+t.length);
+}
+}
+
+function goToLine(){
+let l = parseInt(prompt("Line"));
+if(!l) return;
+
+let p = 0;
+let s = editor.value.split("\n");
+
+for(let i=0;i<l-1;i++){
+p += s[i].length + 1;
+}
+
+editor.focus();
+editor.setSelectionRange(p,p);
+}
 
 updateLines();
 
